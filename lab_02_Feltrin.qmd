@@ -1,0 +1,109 @@
+---
+title: "Lab02"
+author: "Mariana Zamith Feltrin"
+format: pdf
+editor: visual
+---
+
+## Exercício 1
+
+Para calcular as estatísticas suficientes para a determinação do percentual de voos atrasados na chegada (ARRIVAL_DELAY \> 10) por dia e companhia aéra, precisamos do número de voos atrasados e o número total de voos no dia e companhia desejados.
+
+## Exercício 2
+
+```{r}
+library(dplyr)
+library(readr)
+
+getStats <- function(input, pos) {
+  input %>%
+    filter(AIRLINE %in% c("AA", "DL", "UA", "US")) %>%
+    filter(!is.na(MONTH), !is.na(DAY), !is.na(ARRIVAL_DELAY)) %>%
+    group_by(MONTH, DAY, AIRLINE) %>%
+    summarise(
+      n_total = n(),
+      n_atrasados = sum(ARRIVAL_DELAY > 10),
+      .groups = "drop"
+    )
+}
+
+# .groups = "drop", ao salvar de volta, não guarda o resultado no agrupamento utilizado
+```
+
+## Exercício 3
+
+```{r}
+#colunas que vão ser usadas
+mycols <- cols_only(
+  MONTH = col_integer(),
+  DAY = col_integer(),
+  AIRLINE = col_character(),
+  ARRIVAL_DELAY = col_double()
+)
+
+
+in2 <- read_csv_chunked(
+  "flights.csv.zip",
+  callback = DataFrameCallback$new(getStats),
+  chunk_size = 100000,
+  col_types = mycols
+)
+
+in2
+```
+
+## Exercício 4
+
+```{r}
+computeStats <- function(input) {
+  input %>%
+    group_by(MONTH, DAY, AIRLINE) %>%
+    summarise(
+      n_total = sum(n_total),
+      n_atrasados = sum(n_atrasados),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Cia = AIRLINE,
+      Data = as.Date(
+        paste(2015, MONTH, DAY, sep = "-")
+      ),
+      Perc = n_atrasados / n_total
+    ) %>%
+    select(Cia, Data, Perc)
+}
+
+dados_finais <- computeStats(in2)
+dados_finais
+```
+
+## Exercício 5
+
+```{r}
+library(ggplot2)
+library(ggcal)
+
+pal <- scale_fill_gradient(low = "#4575b4", high = "#d73027")
+
+baseCalendario <- function(stats, cia) {
+  df_cia <- stats %>% filter(Cia == cia)
+  ggcal(df_cia$Data, df_cia$Perc)
+}
+
+cAA <- baseCalendario(dados_finais, "AA") + pal + ggtitle("Percentual de Atraso em 2015 - American Airlines (AA)")
+cDL <- baseCalendario(dados_finais, "DL") + pal + ggtitle("Percentual de Atraso em 2015 - Delta Air Lines (DL)")
+cUA <- baseCalendario(dados_finais, "UA") + pal + ggtitle("Percentual de Atraso em 2015 - United Airlines (UA)")
+cUS <- baseCalendario(dados_finais, "US") + pal + ggtitle("Percentual de Atraso em 2015 - US Airways (US)")
+
+cAA
+cDL
+cUA
+cUS
+```
+
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
+
