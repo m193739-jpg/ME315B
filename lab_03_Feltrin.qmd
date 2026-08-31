@@ -1,0 +1,124 @@
+---
+title: "lab 03"
+author: "Mariana Zamith Feltrin"
+format: pdf
+editor: visual
+---
+
+##Exercício 1
+
+```{r}
+library(readr)
+library(dplyr)
+```
+
+```{r}
+airlines <- read_csv("airlines.csv")
+airlines
+```
+
+```{r}
+airports <- read_csv("airports.csv", col_types =  cols(
+  IATA_CODE = col_character(),
+  CITY = col_character(),
+  STATE = col_character(),
+  LATITUDE = col_double(),
+  LONGITUDE = col_double()
+  ))
+airports
+```
+
+
+```{r}
+limpeza <- function(chunk, pos) {
+  chunk %>%
+    filter(!startsWith(DESTINATION_AIRPORT, "1")) %>%
+    na.omit() %>%
+    group_by(DESTINATION_AIRPORT) %>%
+    summarise(
+      soma_atraso = sum(ARRIVAL_DELAY),
+      total_voos  = n(),
+      .groups = "drop"
+    )
+}
+
+stats <- read_csv_chunked(
+  "flights.csv",
+  callback = DataFrameCallback$new(limpeza),
+  chunk_size = 1e6,
+  col_types = cols_only(
+    DESTINATION_AIRPORT = col_character(),
+    ARRIVAL_DELAY = col_double()
+  )
+)
+
+flights <- stats %>%
+  group_by(DESTINATION_AIRPORT) %>%
+  summarise(
+    MEDIA_ATRASO = sum(soma_atraso) / sum(total_voos),
+    TOTAL_VOOS   = sum(total_voos)
+  )
+
+flights
+```
+
+
+##Exercício 2
+
+Na tabela flights a chave é DESTINATION_AIRPORT. Já na airports é IATA_CODE.
+
+```{r}
+ausentes <- flights %>%
+  anti_join(airports, by = c("DESTINATION_AIRPORT" = "IATA_CODE"))
+print(ausentes)
+```
+
+```{r}
+flights <- flights %>%
+  left_join(
+    airports,
+    by = c("DESTINATION_AIRPORT" = "IATA_CODE")
+  )
+flights
+```
+
+
+##Exercício 3
+
+```{r}
+aeroportos_por_estado <- airports %>%
+  group_by(STATE) %>%
+  summarise(QTD_AEROPORTOS = n_distinct(IATA_CODE)) %>%
+  arrange(desc(QTD_AEROPORTOS))
+
+aeroportos_por_estado
+```
+
+
+##Exercício 4
+
+```{r}
+library(leaflet)
+
+this <- flights %>%
+  filter(!is.na(LATITUDE), !is.na(LONGITUDE)) %>%
+  leaflet() %>%
+  addTiles() %>%
+  addMarkers(
+    lng = ~LONGITUDE,
+    lat = ~LATITUDE,
+    popup = ~paste0(
+      "<b>Cidade: </b>", CITY, " - ", STATE, "<br>",
+      "<b>Aeroporto: </b>", DESTINATION_AIRPORT, "<br>",
+      "<b>Atraso Médio: </b>", round(MEDIA_ATRASO, 2), " min"
+    )
+  )
+
+this
+```
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
+
