@@ -1,0 +1,94 @@
+---
+title: "lab_06_Feltrin"
+author: "Mariana Zamith Feltrin"
+format: pdf
+editor: visual
+---
+
+## Exercício 1
+```{r}
+path <- getwd()
+  
+fname <- file.path(path, "disco.db")
+fname
+```
+
+
+## Exercício 2
+```{r}
+library(RSQLite)
+library(DBI)
+
+conn <- dbConnect(RSQLite::SQLite(), "disco.db")
+```
+
+
+## Exercício 3
+```{r}
+dbListTables(conn)
+```
+
+
+## Exercício 4
+```{r}
+dbListFields(conn, "customers")
+```
+
+
+## Exercício 5
+```{r}
+dbGetQuery(conn, "SELECT COUNT(*) FROM customers")
+```
+
+
+##  Exercício 6
+```{sql connection=conn}
+SELECT COUNT(DISTINCT COUNTRY) FROM CUSTOMERS
+```
+
+
+## Exercício 7
+```{sql connection=conn}
+SELECT COUNTRY, COUNT(*) AS TOTAL_CLIENTES FROM CUSTOMERS
+GROUP BY COUNTRY
+ORDER BY TOTAL_CLIENTES DESC
+```
+
+
+## Exercício 8
+```{sql connection=conn}
+SELECT COUNTRY, COUNT(*) AS TOTAL_CLIENTES FROM CUSTOMERS
+GROUP BY COUNTRY
+ORDER BY TOTAL_CLIENTES DESC
+LIMIT 5
+```
+
+
+## Exercício 9
+```{sql connection=conn}
+SELECT DISTINCT COUNTRY FROM CUSTOMERS 
+WHERE LENGTH(COUNTRY) = 6
+```
+
+
+## Exercício 10
+```{sql connection=conn}
+SELECT DISTINCT T.NAME AS MUSIC FROM CUSTOMERS C
+JOIN INVOICES I ON C.CUSTOMERID = I.CUSTOMERID
+JOIN INVOICE_ITEMS II ON I.INVOICEID = II.INVOICEID
+JOIN TRACKS T ON II.TRACKID = T.TRACKID
+WHERE C.COUNTRY = 'Brazil'
+```
+
+
+## Exercício 11
+```{r}
+dbDisconnect(conn)
+```
+
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
+
