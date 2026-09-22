@@ -1,0 +1,181 @@
+---
+title: "lab 07"
+author: Mariana Zamith Feltrin
+format: pdf
+editor: visual
+---
+
+## Exercício 1
+
+```{r}
+library(DBI)
+library(RSQLite)
+
+conn <- dbConnect(RSQLite::SQLite(), "database.sqlite3")
+```
+
+
+## Exercício 2
+
+```{r}
+query <- "
+  SELECT DISTINCT i.id, i.name
+  FROM subjects sub
+  JOIN subject_memberships sm ON sub.code = sm.subject_code
+  JOIN sections sec ON sm.course_offering_uuid = sec.course_offering_uuid
+  JOIN teachings t ON sec.uuid = t.section_uuid
+  JOIN instructors i ON t.instructor_id = i.id
+  WHERE sub.abbreviation = 'STAT';
+"
+
+professores_stat <- dbGetQuery(conn, query)
+
+# Quem são os professores
+professores_stat$name
+
+# Quantos são
+nrow(professores_stat)
+```
+
+
+## Exercício 3
+```{r}
+# Calcula o GPA de cada oferecimento
+query <- "
+WITH gpa_oferecimento AS (
+    SELECT
+        course_offering_uuid,
+        (
+            CAST(a_count AS REAL) * 4.0 +
+            CAST(ab_count AS REAL) * 3.5 +
+            CAST(b_count AS REAL) * 3.0 +
+            CAST(bc_count AS REAL) * 2.5 +
+            CAST(c_count AS REAL) * 2.0 +
+            CAST(d_count AS REAL) * 1.0 +
+            CAST(f_count AS REAL) * 0.0
+        )
+        /
+        (
+            CAST(a_count AS REAL) +
+            CAST(ab_count AS REAL) +
+            CAST(b_count AS REAL) +
+            CAST(bc_count AS REAL) +
+            CAST(c_count AS REAL) +
+            CAST(d_count AS REAL) +
+            CAST(f_count AS REAL)
+        ) AS gpa
+    FROM grade_distributions
+    WHERE (
+        CAST(a_count AS REAL) +
+        CAST(ab_count AS REAL) +
+        CAST(b_count AS REAL) +
+        CAST(bc_count AS REAL) +
+        CAST(c_count AS REAL) +
+        CAST(d_count AS REAL) +
+        CAST(f_count AS REAL)
+    ) > 0
+),
+oferecimentos_stat AS (
+    SELECT DISTINCT
+        g.course_offering_uuid,
+        c.number AS disciplina,
+        i.id AS instructor_id,
+        i.name AS professor,
+        g.gpa
+    FROM gpa_oferecimento g
+    JOIN course_offerings co
+        ON g.course_offering_uuid = co.uuid
+    JOIN courses c
+        ON co.course_uuid = c.uuid
+    JOIN subject_memberships sm
+        ON co.uuid = sm.course_offering_uuid
+    JOIN subjects sub
+        ON sm.subject_code = sub.code
+    JOIN sections sec
+        ON co.uuid = sec.course_offering_uuid
+    JOIN teachings t
+        ON sec.uuid = t.section_uuid
+    JOIN instructors i
+        ON t.instructor_id = i.id
+    WHERE sub.abbreviation = 'STAT'
+)
+SELECT * FROM oferecimentos_stat;
+"
+
+df <- dbGetQuery(conn, query)
+
+
+# GPA médio de cada professor
+gpa_professores <- aggregate(
+    gpa ~ professor,
+    data = df,
+    FUN = mean
+)
+
+
+# GPA médio de cada disciplina
+gpa_disciplinas <- aggregate(
+    gpa ~ disciplina,
+    data = df,
+    FUN = mean
+)
+
+
+# Estatícas
+professor_mais_dificil <- gpa_professores[
+    which.min(gpa_professores$gpa),
+]
+
+professor_mais_facil <- gpa_professores[
+    which.max(gpa_professores$gpa),
+]
+
+disciplina_mais_dificil <- gpa_disciplinas[
+    which.min(gpa_disciplinas$gpa),
+]
+
+disciplina_mais_facil <- gpa_disciplinas[
+    which.max(gpa_disciplinas$gpa),
+]
+
+
+# Tabela final com os resultados
+resultado <- data.frame(
+    Categoria = c(
+        "Professor mais difícil",
+        "Professor mais fácil",
+        "Disciplina mais difícil",
+        "Disciplina mais fácil"
+    ),
+    Nome = c(
+        professor_mais_dificil$professor,
+        professor_mais_facil$professor,
+        disciplina_mais_dificil$disciplina,
+        disciplina_mais_facil$disciplina
+    ),
+    GPA_Medio = round(
+        c(
+            professor_mais_dificil$gpa,
+            professor_mais_facil$gpa,
+            disciplina_mais_dificil$gpa,
+            disciplina_mais_facil$gpa
+        ),
+        2
+    )
+)
+
+resultado
+```
+
+
+## Exercício 4
+
+```{r}
+dbDisconnect(conn)
+```
+
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
