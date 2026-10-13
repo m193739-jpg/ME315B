@@ -1,0 +1,105 @@
+---
+title: "lab_08_Feltrin"
+author: "Mariana Zamith Feltrin"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(reticulate)
+```
+
+```{r}
+py_require("polars")
+py_require("matplotlib")
+py_require("plotnine")
+py_require("pandas")
+py_require("pyarrow")
+```
+
+```{python}
+import polars as pl
+
+#importando os bancos de dados
+
+basics = pl.read_csv(
+    "title.basics0.tsv.gz", 
+    separator="\t", 
+    null_values="\\N"
+)
+
+ratings = pl.read_csv(
+    "title.ratings.tsv.gz", 
+    separator="\t", 
+    null_values="\\N"
+)
+
+principals = pl.read_csv(
+    "title.principals0.tsv.gz", 
+    separator="\t", 
+    null_values="\\N"
+)
+```
+
+# Exercício 1
+```{python}
+# Filtrando apenas os filmes
+filmes = basics.filter(pl.col("titleType") == "movie")
+
+# Unindo com a tabela de notas e ordenando
+top5_filmes = (
+    filmes.join(ratings, on="tconst", how="inner")
+    .sort(["averageRating", "numVotes"], descending=[True, True])
+    .select(["primaryTitle", "averageRating", "numVotes"])
+    .head(5)
+)
+
+print(top5_filmes)
+```
+
+# Exercício 2
+```{python}
+# Considerando apenas filmes com averageRating > 8, organizando e agrupando por gênero
+
+genero_frequente = (
+    filmes.join(ratings, on="tconst", how="inner")
+    .filter(pl.col("averageRating") > 8)
+    .with_columns(pl.col("genres").str.split(","))
+    .explode("genres")
+    .group_by("genres")
+    .len()
+    .sort("len", descending=True)
+    .head(1)
+)
+
+print(genero_frequente)
+```
+
+# Exercício 3
+```{python}
+# Filtrando os filmes, unindo e agrupando os elencos
+
+elenco = principals.filter(pl.col("category").is_in(["actor", "actress"]))
+
+filmes_boa_nota = (
+    filmes.join(ratings, on="tconst", how="inner")
+    .filter(pl.col("averageRating") > 7.5)
+)
+
+top3_atores = (
+    filmes_boa_nota.join(elenco, on="tconst", how="inner")
+    .group_by("nconst")
+    .len()
+    .sort("len", descending=True)
+    .head(3)
+)
+
+print(top3_atores)
+```
+
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
+
